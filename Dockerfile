@@ -1,5 +1,5 @@
 ARG RHEL_VERSION
-FROM rockylinux:${RHEL_VERSION}
+FROM rockylinux/rockylinux:${RHEL_VERSION}
 
 ARG RHEL_VERSION
 ARG PG_VERSION
@@ -26,10 +26,12 @@ RUN if [ "${RHEL_VERSION}" = "8" ]; then \
         dnf install -y --enablerepo=crb perl-IPC-Run; \
     fi
 RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-${RHEL_VERSION}-x86_64/pgdg-redhat-repo-latest.noarch.rpm
-RUN dnf -qy module disable postgresql
+RUN if [ "${RHEL_VERSION}" = "8" || "${RHEL_VERSION}" = "9" ]; then \
+        dnf -qy module disable postgresql; \
+    fi
 
 # If you install the beta version, you need to enable pgdg${PG_VERSION}-updates-testing
-RUN if [ "${PG_VERSION}" = "17" ]; then \
+RUN if [ "${PG_VERSION}" = "18" ]; then \
         dnf install -y --enablerepo=pgdg${PG_VERSION}-updates-testing \
             postgresql${PG_VERSION}-server \
             postgresql${PG_VERSION}-devel \
@@ -63,8 +65,14 @@ RUN cd pg_hint_plan && \
         --prefix=pg_hint_plan${PG_VERSION}-${PG_HINT_PLAN_VERSION}/ \
         --output=../rpmbuild/SOURCES/pg_hint_plan${PG_VERSION}-${PG_HINT_PLAN_VERSION}.tar.gz
 RUN cp -a pg_hint_plan/SPECS/pg_hint_plan${PG_VERSION}.spec rpmbuild/SPECS
-RUN rpmbuild rpmbuild/SPECS/pg_hint_plan${PG_VERSION}.spec \
-        -bb --define="dist .pg${PG_VERSION}.rhel${RHEL_VERSION}"
+
+RUN if [ "${PG_VERSION}" = "13" ]; then \
+        QA_RPATHS=0x0002 rpmbuild rpmbuild/SPECS/pg_hint_plan${PG_VERSION}.spec \
+            -bb --define="dist .pg${PG_VERSION}.rhel${RHEL_VERSION}"; \
+    else \
+        rpmbuild rpmbuild/SPECS/pg_hint_plan${PG_VERSION}.spec \
+            -bb --define="dist .pg${PG_VERSION}.rhel${RHEL_VERSION}"; \
+    fi
 
 
 ################################################################################
